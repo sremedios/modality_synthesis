@@ -3,3 +3,4 @@ data/
 **/*.swp
 **/__init__.py
 **/weights/
+*.png
