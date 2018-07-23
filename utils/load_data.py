@@ -54,19 +54,30 @@ def pad_image(img_data, target_dims):
     right_pad = round(float(target_dims[0] - img_data.shape[0]) - left_pad)
     top_pad = round(float(target_dims[1] - img_data.shape[1]) / 2 )
     bottom_pad = round(float(target_dims[1] - img_data.shape[1]) - top_pad)
-    front_pad = round(float(target_dims[2] - img_data.shape[2]) / 2 )
-    back_pad = round(float(target_dims[2] - img_data.shape[2]) - front_pad)
-    pads = ((left_pad, right_pad),
-            (top_pad, bottom_pad),
-            (front_pad, back_pad))
 
-
-    num_channels = img_data.shape[-1]
+    num_channels = 1#img_data.shape[-1]
     new_img = np.zeros((*target_dims, num_channels),
                         dtype=np.float16)
 
-    for c in range(num_channels):
-        new_img[:,:,:,c] = np.pad(img_data[:,:,:,c], pads, 'constant', constant_values=0)
+    if len(img_data.shape) == 3:
+        front_pad = round(float(target_dims[2] - img_data.shape[2]) / 2 )
+        back_pad = round(float(target_dims[2] - img_data.shape[2]) - front_pad)
+
+        pads = ((left_pad, right_pad),
+                (top_pad, bottom_pad),
+                (front_pad, back_pad))
+
+
+        for c in range(num_channels):
+            new_img[:,:,:,c] = np.pad(img_data[:,:,:,c], pads, 'constant', constant_values=0)
+
+    elif len(img_data.shape) == 2:
+        pads = ((left_pad, right_pad),
+                (top_pad, bottom_pad),)
+
+
+        for c in range(num_channels):
+            new_img[:,:,c] = np.pad(img_data[:,:,c], pads, 'constant', constant_values=0)
 
     return new_img 
 

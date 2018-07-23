@@ -29,82 +29,121 @@ def load_slices(filename):
     Returns a np.array of slices: [slice_idx, height, width, channels==1]
     '''
     img = nib.load(filename).get_data()
+    IMG_MAX = np.max(img)
     img_slices = np.zeros((img.shape[-1], img.shape[0], img.shape[1], 1), dtype=np.float16)
     for idx in range(len(img_slices)):
-        img_slices[idx, :, :, 0] = img[:,:,idx]
+        img_slices[idx, :, :, 0] = img[:,:,idx] / IMG_MAX
 
     return img_slices
 
 def load_middle_slice(filename):
-    '''
-    Loads a single-channel image and adds a dimension for the implicit "1" dimension
-    Returns a np.array of slices: [slice_idx, height, width, channels==1]
-    '''
     img = nib.load(filename).get_data()
     img_slice = np.zeros((1, img.shape[0], img.shape[1], 1), dtype=np.float16)
     middle_idx = img.shape[2]//2
     img_slice[0,:,:,0] = img[:,:,middle_idx]
     return img_slice
 
-def load_middle_slice_data(data_dir):
+def load_multiclass_slice_data(data_dir, middle_only=False):
     '''
-    Loads all 2D image slices from 3D images  and returns them.
-    '''
-
-    #################### CLASSIFICATION OF UNKNOWN DATA ####################
-
-    filenames = [os.path.join(data_dir, x) for x in os.listdir(data_dir)
-                 if not os.path.isdir(os.path.join(data_dir, x))]
-    filenames.sort()
-
-    img_shape = nib.load(filenames[0]).get_data().shape
-    total_num_slices = len(filenames)
-    data = np.zeros(shape=((total_num_slices,) + img_shape[:-1] + (1,)), 
-                            dtype=np.float16)
-    all_slice_filenames = [None] * total_num_slices
-    indices = np.arange(len(data))
-    indices = shuffle(indices, random_state=0)
-    cur_idx = 0
-
-    for f in tqdm(filenames):
-        img_slice = load_middle_slice(f)
-        data[indices[cur_idx]] = img_slice
-        all_slice_filenames[indices[cur_idx]] = f
-        cur_idx += 1
-
-    print(data.shape)
-    return data, all_slice_filenames, data[0].shape
-
-def load_slice_data(data_dir):
-    '''
-    Loads all 2D image slices from 3D images  and returns them.
+    Loads all 2D image slices from 3D images and returns them.
+    Loads specifically from both T1 and T2 folders and returns them
     '''
 
     #################### CLASSIFICATION OF UNKNOWN DATA ####################
 
-    filenames = [os.path.join(data_dir, x) for x in os.listdir(data_dir)
-                 if not os.path.isdir(os.path.join(data_dir, x))]
-    filenames.sort()
+    t1_data_dir = os.path.join(data_dir, "T1")
+    t2_data_dir = os.path.join(data_dir, "T2")
 
-    img_shape = nib.load(filenames[0]).get_data().shape
-    total_num_slices = len(filenames) * img_shape[-1]
-    data = np.zeros(shape=((total_num_slices,) + img_shape[:-1] + (1,)), 
+    tmp_file = os.path.join(t1_data_dir, os.listdir(t1_data_dir)[0])
+    img_shape = nib.load(tmp_file).get_data().shape
+
+    if middle_only:
+        total_num_slices = len(os.listdir(t1_data_dir))
+    else:
+        total_num_slices = len(os.listdir(t1_data_dir)) * img_shape[-1]
+
+    t1_data = np.zeros(shape=((total_num_slices,) + img_shape[:-1] + (1,)), 
                             dtype=np.float16)
-    all_slice_filenames = [None] * total_num_slices
-    indices = np.arange(len(data))
+    t1_slice_filenames = [None] * total_num_slices
+
+    t2_data = np.zeros(shape=((total_num_slices,) + img_shape[:-1] + (1,)), 
+                            dtype=np.float16)
+    t2_slice_filenames = [None] * total_num_slices
+
+    combined_data_dict = {t1_data_dir: t1_data,
+                          t2_data_dir: t2_data}
+    combined_filenames_dict = {t1_data_dir: t1_slice_filenames,
+                               t2_data_dir: t2_slice_filenames}
+
+    indices = np.arange(len(t1_data))
     indices = shuffle(indices, random_state=0)
-    cur_idx = 0
 
-    for f in tqdm(filenames):
-        img_slices = load_slices(f)
+    for cur_dir in (t1_data_dir, t2_data_dir):
+        # set cur_idx back to start for both sets of T1 and T2
+        cur_idx = 0
+        filenames = [os.path.join(cur_dir, x) for x in os.listdir(cur_dir)
+                     if not os.path.isdir(os.path.join(cur_dir, x))]
+        filenames.sort()
 
-        for img_slice in img_slices:
-            data[indices[cur_idx]] = img_slice
-            all_slice_filenames[indices[cur_idx]] = f
+        for f in tqdm(filenames):
+            if middle_only:
+                img_slice = load_middle_slice(f)
+                combined_data_dict[cur_dir][indices[cur_idx]] = img_slice
+                combined_filenames_dict[cur_dir][indices[cur_idx]] = f
+
+            else:
+                img_slices = load_slices(f)
+
+                for img_slice in img_slices:
+                    combined_data_dict[cur_dir][indices[cur_idx]] = img_slice
+                    combined_filenames_dict[cur_dir][indices[cur_idx]] = f
             cur_idx += 1
 
-    print(data.shape)
-    return data, all_slice_filenames, data[0].shape
+        print(cur_dir,"shape:",combined_data_dict[cur_dir].shape)
+
+    return (combined_data_dict[t1_data_dir], 
+           combined_data_dict[t2_data_dir],
+           combined_filenames_dict[t1_data_dir], 
+           combined_filenames_dict[t2_data_dir], 
+           combined_data_dict[t1_data_dir][0].shape)
+
+
+def load_slice_data(data_dir, middle_only=False):
+    '''
+    Loads all 2D image slices from 3D images and returns them.
+
+    Naively appends lists, then converts to ndarrays and shuffles
+    '''
+
+    #################### CLASSIFICATION OF UNKNOWN DATA ####################
+
+    filenames = [os.path.join(data_dir, x) for x in os.listdir(data_dir)
+                 if not os.path.isdir(os.path.join(data_dir, x))]
+    filenames.sort()
+
+    data = []
+    slice_filenames = []
+
+    for f in tqdm(filenames):
+        if middle_only:
+            img_slice = load_middle_slice(f)
+            data.append(img_slice)
+            slice_filenames.append(f)
+
+        else:
+            img_slices = load_slices(f)
+
+            for img_slice in img_slices:
+                if not np.any(np.isnan(img_slice)) and np.sum(img_slice) != 0:
+                    data.append(img_slice)
+                    slice_filenames.append(f)
+
+    data = np.array(data, dtype=np.float16)
+    data, slice_filenames = shuffle(data, slice_filenames)
+
+    return (data, 
+           slice_filenames,
+           data[0].shape)
 
 
 
