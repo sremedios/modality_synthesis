@@ -11,6 +11,8 @@ import sys
 
 if __name__ == '__main__':
 
+    NUM_GPUS = 3
+
     ########## DIRECTORY SETUP ##########
 
     ROOT_DIR = "data"
@@ -25,42 +27,13 @@ if __name__ == '__main__':
 
     ########## LOAD DATA ##########
 
-    '''
-    X_T1, X_T2, filenames_T1, filenames_T2, dims = load_slice_data(TRAIN_DIR,
-                                                                   middle_only=False)
-
-
-    # verify to operate over co-registered data
-    for f1, f2 in zip(filenames_T1, filenames_T2):
-        if os.path.basename(f1[:f1.find("_")]) != os.path.basename(f2[:f2.find("_")]):
-            print(f1,'\n',f2)
-            print("Coregister pair mismatch!  Please check code")
-            sys.exit()
-    '''
-
-    # train on a subset for testing
-    '''
-    LIMIT = 10
-    X_T1 = X_T1[0:LIMIT]
-    X_T2 = X_T2[0:LIMIT]
-    filenames_T1 = filenames_T1[0:LIMIT]
-    filenames_T2 = filenames_T2[0:LIMIT]
-
-    for i in range(10):
-        print("Displaying", filenames_T1[i])
-        dual_show_image(X_T1[i,:,:,0], X_T2[i,:,:,0])
-    '''
     X, filenames, dims = load_slice_data(TRAIN_DIR, middle_only=False)
 
     ########## CALLBACKS ##########
 
     monitor_metric = "loss"
-    #monitor_metric = "correlation_coefficient_loss" 
-    #checkpoint_filename = cur_time + "_epoch_{epoch:04d}_" + \
-        #monitor_metric + "_{"+monitor_metric+":.4f}_vae_weights.hdf5"
-
-    checkpoint_filename = "most_recent_vae_weights.hdf5" # to train to convergence w/o running out of space
-
+    # to train to convergence w/o running out of space
+    checkpoint_filename = "most_recent_vae_weights.hdf5" 
 
     weight_path = os.path.join(WEIGHT_DIR, checkpoint_filename)
 
@@ -75,16 +48,18 @@ if __name__ == '__main__':
     callbacks_list = [mc, es]
 
     ########## MODEL SETUP ##########
-    #encoder, decoder, model = vae_2D(model_path=model_path,
+
+    learning_rate = 1e-4
     encoder, decoder, model = inception_vae_2D(model_path=model_path,
                                      num_channels=X.shape[-1],
                                      ds=8,
                                      dims=dims,
-                                     learning_rate=1e-4)
+                                     learning_rate=learning_rate,
+                                     num_gpus=NUM_GPUS)
 
     ########## TRAIN ##########
 
-    batch_size = 16 
+    batch_size = 12 
     epochs = 10000000
     start_time = time.time()
 

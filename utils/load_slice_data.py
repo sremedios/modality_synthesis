@@ -38,9 +38,10 @@ def load_slices(filename):
 
 def load_middle_slice(filename):
     img = nib.load(filename).get_data()
-    img_slice = np.zeros((1, img.shape[0], img.shape[1], 1), dtype=np.float16)
+    IMG_MAX = np.max(img)
+    img_slice = np.zeros((img.shape[0], img.shape[1], 1), dtype=np.float16)
     middle_idx = img.shape[2]//2
-    img_slice[0,:,:,0] = img[:,:,middle_idx]
+    img_slice[:,:,0] = img[:,:,middle_idx] / IMG_MAX
     return img_slice
 
 def load_multiclass_slice_data(data_dir, middle_only=False):
@@ -107,7 +108,57 @@ def load_multiclass_slice_data(data_dir, middle_only=False):
            combined_filenames_dict[t2_data_dir], 
            combined_data_dict[t1_data_dir][0].shape)
 
+"""
+def load_slice_data(data_dir, middle_only=False):
+    '''
+    Loads all 2D image slices from 3D images and returns them.
+    Loads specifically from both T1 and T2 folders and returns them
+    '''
 
+    # manually chosen
+    target_dims = (256, 288)
+
+    t1_data_dir = os.path.join(data_dir)
+
+    tmp_file = os.path.join(t1_data_dir, os.listdir(t1_data_dir)[0])
+    img_shape = nib.load(tmp_file).get_data().shape
+
+    if middle_only:
+        total_num_slices = len(os.listdir(t1_data_dir))
+    else:
+        total_num_slices = len(os.listdir(t1_data_dir)) * img_shape[-1]
+
+    t1_data = np.zeros(shape=((total_num_slices,) + target_dims + (1,)), 
+                            dtype=np.float16)
+    t1_slice_filenames = [None] * total_num_slices
+
+    indices = np.arange(len(t1_data))
+    indices = shuffle(indices, random_state=0)
+
+    # set cur_idx back to start for both sets of T1 and T2
+    cur_idx = 0
+    filenames = [os.path.join(t1_data_dir, x) for x in os.listdir(t1_data_dir)
+                 if not os.path.isdir(os.path.join(t1_data_dir, x))]
+    filenames.sort()
+
+    for f in tqdm(filenames):
+        if middle_only:
+            img_slice = pad_image(load_middle_slice(f), target_dims)
+            t1_data[indices[cur_idx]] = img_slice
+            t1_slice_filenames[indices[cur_idx]] = f
+
+        else:
+            img_slices = load_slices(f)
+
+            for img_slice in img_slices:
+                t1_data[indices[cur_idx]] = pad_image(img_slice, target_dims)
+                t1_slice_filenames[indices[cur_idx]] = f
+        cur_idx += 1
+
+    return t1_data, t1_slice_filenames, t1_data[0].shape
+
+
+"""
 def load_slice_data(data_dir, middle_only=False):
     '''
     Loads all 2D image slices from 3D images and returns them.
@@ -124,9 +175,12 @@ def load_slice_data(data_dir, middle_only=False):
     data = []
     slice_filenames = []
 
+    # manually chosen
+    target_dims = (256, 320)
+
     for f in tqdm(filenames):
         if middle_only:
-            img_slice = load_middle_slice(f)
+            img_slice = lazy_downsample(pad_image(load_middle_slice(f), target_dims))
             data.append(img_slice)
             slice_filenames.append(f)
 
@@ -135,11 +189,12 @@ def load_slice_data(data_dir, middle_only=False):
 
             for img_slice in img_slices:
                 if not np.any(np.isnan(img_slice)) and np.sum(img_slice) != 0:
-                    data.append(img_slice)
+                    data.append(lazy_downsample(pad_image(img_slice, target_dims)))
                     slice_filenames.append(f)
 
     data = np.array(data, dtype=np.float16)
-    data, slice_filenames = shuffle(data, slice_filenames)
+    # skip shuffling for now
+    #data, slice_filenames = shuffle(data, slice_filenames)
 
     return (data, 
            slice_filenames,
@@ -244,3 +299,33 @@ def load_data(data_dir, classes=None):
     return data, labels, all_filenames, num_classes, data[0].shape
 
 
+def pad_image(img_data, target_dims):
+    '''
+    Pads a 2D slice
+    '''
+    left_pad = round(float(target_dims[0] - img_data.shape[0]) / 2)
+    right_pad = round(float(target_dims[0] - img_data.shape[0]) - left_pad)
+    top_pad = round(float(target_dims[1] - img_data.shape[1]) / 2)
+    bottom_pad = round(float(target_dims[1] - img_data.shape[1]) - top_pad)
+
+    num_channels = 1
+    new_img = np.zeros((*target_dims, num_channels),
+                       dtype=np.float16)
+
+    pads = ((left_pad, right_pad),
+            (top_pad, bottom_pad),)
+
+    for c in range(num_channels):
+        new_img[:,:,c] = np.pad(img_data[:,:,c], pads, 'constant', constant_values=0)
+
+    return new_img
+
+
+def lazy_downsample(img_data):
+    new_shape = [x//2 for x in img_data.shape[0:2]]
+    new_shape = [new_shape[0], new_shape[1], 1]
+    new_img = np.zeros(new_shape, dtype=np.float16)
+
+    new_img[:,:,0] = img_data[::2,::2,0].copy()
+
+    return new_img
