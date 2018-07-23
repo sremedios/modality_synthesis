@@ -14,6 +14,8 @@ from keras import backend as K
 from keras import metrics
 import tensorflow as tf
 
+from .multi_gpu import ModelMGPU
+
 from sklearn.metrics import normalized_mutual_info_score
 from utils.load_data import pad_image
 import matplotlib.pyplot as plt
@@ -34,8 +36,7 @@ def correlation_coefficient_loss(y_true, y_pred):
     r = K.maximum(K.minimum(r, 1.0), -1.0)
     return 1 - K.square(r)
 
-
-BETA = 1
+BETA = 300 
 
 
 def plot_latent_sampling(models,
@@ -103,7 +104,12 @@ def inception_module_2D(prev_layer, ds=2):
     return out_layer
 
 
-def inception_vae_2D(model_path, num_channels, dims, ds, learning_rate):
+def inception_vae_2D(model_path,
+                     num_channels,
+                     dims,
+                     ds,
+                     learning_rate,
+                     num_gpus=1):
 
     intermediate_dim = 128 
     latent_dim = 2
@@ -117,7 +123,7 @@ def inception_vae_2D(model_path, num_channels, dims, ds, learning_rate):
     x = MaxPooling2D((2, 2), padding='same')(x)
 
     # residual inception modules
-    for _ in range(3):
+    for _ in range(4):
         x = inception_module_2D(x, ds=ds)
         y = Activation('relu')(x)
         x = inception_module_2D(x, ds=ds)
@@ -144,10 +150,10 @@ def inception_vae_2D(model_path, num_channels, dims, ds, learning_rate):
     latent_inputs = Input(shape=(latent_dim,), name="z_sampling")
 
     x = Dense(intermediate_dim, activation='relu')(latent_inputs)
-    x = Dense(11 * 16 * (384//ds), activation='relu')(x)
-    x = Reshape(target_shape=(11, 16, (384//ds)))(x)
+    x = Dense(4 * 5 * (384//ds), activation='relu')(x)
+    x = Reshape(target_shape=(4, 5, (384//ds)))(x)
 
-    for _ in range(4):
+    for _ in range(5):
         x = UpSampling2D((2, 2))(x)
         x = inception_module_2D(x, ds=ds)
         y = Activation('relu')(x)
@@ -185,15 +191,26 @@ def inception_vae_2D(model_path, num_channels, dims, ds, learning_rate):
     def vae_loss(y_true, y_pred):
         return K.mean(mae_loss(y_true, y_pred) + disentangled_kl_loss(y_true, y_pred))
 
+
     vae.compile(optimizer=Adam(lr=learning_rate),
                 loss=vae_loss,
                 metrics=[mae_loss, kl_loss, disentangled_kl_loss],)
 
-    print(vae.summary())
-
+    # save json before checking if multi-gpu 
     json_string = vae.to_json()
     with open(model_path, 'w') as f:
         json.dump(json_string, f)
+
+    print(vae.summary())
+    #print(encoder.summary())
+    #print(decoder.summary())
+
+    # recompile if multi-gpu model
+    if num_gpus > 1:
+        vae = ModelMGPU(vae, num_gpus)
+        vae.compile(optimizer=Adam(lr=learning_rate),
+                    loss=vae_loss,
+                    metrics=[mae_loss, kl_loss, disentangled_kl_loss],)
 
     return encoder, decoder, vae
 
