@@ -22,8 +22,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import json
 
-BETA = 100
-
 def correlation_coefficient_loss(y_true, y_pred):
     x = y_true
     y = y_pred
@@ -41,6 +39,7 @@ def correlation_coefficient_loss(y_true, y_pred):
 
 def plot_latent_sampling(models,
                          dims,
+                         latent_dim,
                          batch_size=128):
 
     encoder, decoder = models
@@ -56,30 +55,38 @@ def plot_latent_sampling(models,
     grid_x = np.linspace(-4, 4, n)
     grid_y = np.linspace(-4, 4, n)[::-1]
 
-    for i, yi in enumerate(grid_y):
-        for j, xi in enumerate(grid_x):
-            z_sample = np.array([[xi, yi]])
-            x_decoded = decoder.predict(z_sample)
-            brain = x_decoded[0].reshape(dims[0], dims[1])
-            # scale for plotting
-            brain = (brain/np.max(brain) * 255).astype(np.uint8)
-            figure[i * t_dims[0]: (i + 1) * t_dims[0],
-                   j * t_dims[1]: (j + 1) * t_dims[1]] = brain.T
+    for dim_1 in range(latent_dim):
+        for dim_2 in range(latent_dim):
+            if dim_1 == dim_2:
+                continue
 
-    plt.figure(figsize=(10, 10))
-    start_range = t_dims[0] // 2
-    end_range = n * t_dims[0]+ start_range + 1
-    pixel_range_x = np.arange(start_range, end_range, t_dims[0])
-    pixel_range_y = np.arange(start_range, end_range, t_dims[1])
-    sample_range_x = np.round(grid_x, 1)
-    sample_range_y = np.round(grid_y, 1)
-    plt.xticks(pixel_range_x, sample_range_x)
-    plt.yticks(pixel_range_y, sample_range_y)
-    plt.xlabel("z[0]")
-    plt.ylabel("z[1]")
-    plt.imshow(figure, cmap='Greys_r')
-    plt.savefig(figure_name_space)
-    plt.show()
+            for i, yi in enumerate(grid_y):
+                for j, xi in enumerate(grid_x):
+                    z_sample = np.zeros((1,latent_dim))
+                    z_sample[0,dim_1] = xi
+                    z_sample[0,dim_2] = yi
+                    #z_sample = np.array([[xi, yi]])
+                    x_decoded = decoder.predict(z_sample)
+                    brain = x_decoded[0].reshape(dims[0], dims[1])
+                    # scale for plotting
+                    brain = (brain/np.max(brain) * 255).astype(np.uint8)
+                    figure[i * t_dims[0]: (i + 1) * t_dims[0],
+                           j * t_dims[1]: (j + 1) * t_dims[1]] = brain.T
+
+            plt.figure(figsize=(10, 10))
+            start_range = t_dims[0] // 2
+            end_range = n * t_dims[0]+ start_range + 1
+            pixel_range_x = np.arange(start_range, end_range, t_dims[0])
+            pixel_range_y = np.arange(start_range, end_range, t_dims[1])
+            sample_range_x = np.round(grid_x, 1)
+            sample_range_y = np.round(grid_y, 1)
+            plt.xticks(pixel_range_x, sample_range_x)
+            plt.yticks(pixel_range_y, sample_range_y)
+            plt.xlabel("z["+str(dim_1)+"]")
+            plt.ylabel("z["+str(dim_2)+"]")
+            plt.imshow(figure, cmap='Greys_r')
+            plt.savefig("z["+str(dim_1)+"]_x_z["+str(dim_2)+"]_" + figure_name_space)
+            #plt.show()
 
 
 def inception_module_2D(prev_layer, ds=2):
@@ -109,10 +116,11 @@ def inception_vae_2D(model_path,
                      dims,
                      ds,
                      learning_rate,
+                     latent_dim,
+                     kl_beta,
                      num_gpus=1):
 
     intermediate_dim = 128 
-    latent_dim = 2
     epsilon_std = 1.0
 
     ########## ENCODER ##########
@@ -183,7 +191,7 @@ def inception_vae_2D(model_path,
         return -0.5 * K.sum(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var), axis=-1)
 
     def disentangled_kl_loss(y_true, y_pred):
-        beta = BETA
+        beta = kl_beta 
         kl_loss = -0.5 * K.sum(1 + z_log_var -
                                K.square(z_mean) - K.exp(z_log_var), axis=-1)
         return beta * kl_loss

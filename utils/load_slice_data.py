@@ -172,6 +172,8 @@ def load_slice_data(data_dir, middle_only=False):
                  if not os.path.isdir(os.path.join(data_dir, x))]
     filenames.sort()
 
+    #filenames = filenames[:3]
+
     data = []
     slice_filenames = []
 

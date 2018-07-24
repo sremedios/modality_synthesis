@@ -50,11 +50,15 @@ if __name__ == '__main__':
     ########## MODEL SETUP ##########
 
     learning_rate = 1e-4
+    latent_dim = 16
+    kl_beta = 100
     encoder, decoder, model = inception_vae_2D(model_path=model_path,
                                      num_channels=X.shape[-1],
                                      ds=8,
                                      dims=dims,
                                      learning_rate=learning_rate,
+                                     latent_dim=latent_dim,
+                                     kl_beta=kl_beta,
                                      num_gpus=NUM_GPUS)
 
     ########## TRAIN ##########
@@ -74,6 +78,7 @@ if __name__ == '__main__':
 
         plot_latent_sampling((encoder, decoder),
                              dims,
+                             latent_dim=latent_dim,
                              batch_size=batch_size)
 
     except:
@@ -81,5 +86,6 @@ if __name__ == '__main__':
 
         plot_latent_sampling((encoder, decoder),
                              dims,
+                             latent_dim=latent_dim,
                              batch_size=batch_size)
 
