@@ -22,6 +22,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import json
 
+BETA = 100
 
 def correlation_coefficient_loss(y_true, y_pred):
     x = y_true
@@ -36,7 +37,6 @@ def correlation_coefficient_loss(y_true, y_pred):
     r = K.maximum(K.minimum(r, 1.0), -1.0)
     return 1 - K.square(r)
 
-BETA = 300 
 
 
 def plot_latent_sampling(models,

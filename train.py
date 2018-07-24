@@ -11,7 +11,7 @@ import sys
 
 if __name__ == '__main__':
 
-    NUM_GPUS = 3
+    NUM_GPUS = 1
 
     ########## DIRECTORY SETUP ##########
 
@@ -59,7 +59,7 @@ if __name__ == '__main__':
 
     ########## TRAIN ##########
 
-    batch_size = 12 
+    batch_size = 16 
     epochs = 10000000
     start_time = time.time()
 

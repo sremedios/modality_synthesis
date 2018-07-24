@@ -54,7 +54,12 @@ if __name__ == '__main__':
             input_img[:,:,i] = img_slices[i,:,:,0]
         '''
 
-        img_slice = load_middle_slice(filename)
+        target_dims = (256, 320)
+        img_slice = lazy_downsample(
+            pad_image(
+                load_middle_slice(filename),
+                target_dims))
+        img_slice = np.reshape(img_slice, (1,) + img_slice.shape)
         pred_slice = model.predict(img_slice, batch_size=1, verbose=0)
 
         '''
@@ -70,9 +75,10 @@ if __name__ == '__main__':
                 os.path.basename(filename))
         '''
 
-        show_image_diffs(img_slice[0,:,:,0], pred_slice[0,:,:,0])
+        show_image_diffs(img_slice[0, :, :, 0], pred_slice[0, :, :, 0])
 
-        compare_histograms(img_slice[0,:,:,0], pred_slice[0,:,:,0], TEST_DIR)
+        compare_histograms(img_slice[0, :, :, 0],
+                           pred_slice[0, :, :, 0], TEST_DIR)
 
         '''
         nii_obj = nib.Nifti1Image(img, affine=affine)
