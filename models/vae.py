@@ -20,6 +20,7 @@ from sklearn.metrics import normalized_mutual_info_score
 from utils.load_data import pad_image
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 import json
 
 def correlation_coefficient_loss(y_true, y_pred):
@@ -40,6 +41,7 @@ def correlation_coefficient_loss(y_true, y_pred):
 def plot_latent_sampling(models,
                          dims,
                          latent_dim,
+                         figure_dir,
                          batch_size=128):
 
     encoder, decoder = models
@@ -85,7 +87,9 @@ def plot_latent_sampling(models,
             plt.xlabel("z["+str(dim_1)+"]")
             plt.ylabel("z["+str(dim_2)+"]")
             plt.imshow(figure, cmap='Greys_r')
-            plt.savefig("z["+str(dim_1)+"]_x_z["+str(dim_2)+"]_" + figure_name_space)
+            fig_name = "z["+str(dim_1)+"]_x_z["+str(dim_2)+"]_" + figure_name_space
+            plt.savefig(os.path.join(figure_dir, fig_name))
+            plt.close()
             #plt.show()
 
 
@@ -130,6 +134,12 @@ def inception_vae_2D(model_path,
     x = Activation('relu')(x)
     x = MaxPooling2D((2, 2), padding='same')(x)
 
+    for _ in range(4):
+        x = inception_module_2D(x, ds=ds)
+        x = Activation('relu')(x)
+        x = MaxPooling2D((2, 2), padding='same')(x)
+
+    '''
     # residual inception modules
     for _ in range(4):
         x = inception_module_2D(x, ds=ds)
@@ -138,6 +148,7 @@ def inception_vae_2D(model_path,
         x = add([x, y])
         x = Activation('relu')(x)
         x = MaxPooling2D((2, 2), padding='same')(x)
+    '''
 
     flat = Flatten()(x)
     hidden = Dense(intermediate_dim, activation='relu')(flat)
@@ -165,9 +176,15 @@ def inception_vae_2D(model_path,
         x = UpSampling2D((2, 2))(x)
         x = inception_module_2D(x, ds=ds)
         y = Activation('relu')(x)
+    '''
+    for _ in range(5):
+        x = UpSampling2D((2, 2))(x)
+        x = inception_module_2D(x, ds=ds)
+        y = Activation('relu')(x)
         x = inception_module_2D(x, ds=ds)
         x = add([x, y])
         x = Activation('relu')(x)
+    '''
 
     decoded = Conv2D(num_channels, (3, 3),
                      activation='linear', padding='same')(x)

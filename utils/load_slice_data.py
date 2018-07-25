@@ -159,7 +159,7 @@ def load_slice_data(data_dir, middle_only=False):
 
 
 """
-def load_slice_data(data_dir, middle_only=False):
+def load_slice_data(data_dir, file_cutoff=None, middle_only=False):
     '''
     Loads all 2D image slices from 3D images and returns them.
 
@@ -172,7 +172,8 @@ def load_slice_data(data_dir, middle_only=False):
                  if not os.path.isdir(os.path.join(data_dir, x))]
     filenames.sort()
 
-    #filenames = filenames[:3]
+    if file_cutoff:
+        filenames = filenames[:file_cutoff]
 
     data = []
     slice_filenames = []
