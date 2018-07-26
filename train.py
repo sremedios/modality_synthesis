@@ -18,8 +18,8 @@ if __name__ == '__main__':
     ROOT_DIR = "data"
     #TRAIN_DIR = os.path.join(ROOT_DIR, "train")
     TRAIN_DIR = os.path.join(ROOT_DIR, "train", "T1")
-    FIGURE_DIR = os.path.join("results", "figures")
     cur_time = str(now())
+    FIGURE_DIR = os.path.join("results", cur_time, "figures")
     WEIGHT_DIR = os.path.join("models", "weights", cur_time)
     model_path = os.path.join(WEIGHT_DIR, "vae.json")
 
@@ -30,7 +30,7 @@ if __name__ == '__main__':
     ########## LOAD DATA ##########
 
     X, filenames, dims = load_slice_data(TRAIN_DIR,
-                                         file_cutoff=10,
+                                         file_cutoff=5,
                                          middle_only=False)
 
     ########## CALLBACKS ##########
@@ -54,20 +54,26 @@ if __name__ == '__main__':
     ########## MODEL SETUP ##########
 
     learning_rate = 1e-4
-    latent_dim = 4
-    kl_beta = 100
-    encoder, decoder, model = inception_vae_2D(model_path=model_path,
-                                               num_channels=X.shape[-1],
-                                               ds=8,
-                                               dims=dims,
-                                               learning_rate=learning_rate,
-                                               latent_dim=latent_dim,
-                                               kl_beta=kl_beta,
-                                               num_gpus=NUM_GPUS)
+    latent_dim = 3
+    kl_beta = 10
+    model = inception_vae_2D(model_path=model_path,
+                             num_channels=X.shape[-1],
+                             ds=8,
+                             dims=dims,
+                             learning_rate=learning_rate,
+                             latent_dim=latent_dim,
+                             kl_beta=kl_beta,
+                             num_gpus=NUM_GPUS)
+
+    # continue training
+    try:
+        model.load_weights(sys.argv[1])
+    except IndexError:
+        pass 
 
     ########## TRAIN ##########
 
-    batch_size = 16
+    batch_size = 64 
     epochs = 10000000
     start_time = time.time()
 
@@ -80,7 +86,7 @@ if __name__ == '__main__':
                   verbose=1)
         print("Elapsed time: {:.4f}s".format(time.time() - start_time))
 
-        plot_latent_sampling((encoder, decoder),
+        plot_latent_sampling(model.get_layer("decoder"),
                              dims,
                              latent_dim=latent_dim,
                              figure_dir=FIGURE_DIR,
@@ -89,7 +95,7 @@ if __name__ == '__main__':
     except:
         print("Elapsed time: {:.4f}s".format(time.time() - start_time))
 
-        plot_latent_sampling((encoder, decoder),
+        plot_latent_sampling(model.get_layer("decoder"),
                              dims,
                              latent_dim=latent_dim,
                              figure_dir=FIGURE_DIR,

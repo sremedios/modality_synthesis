@@ -3,6 +3,7 @@ from utils.load_slice_data import *
 from utils.display import *
 
 from keras.models import load_model, model_from_json
+from models.vae import plot_latent_sampling
 import os
 import sys
 import json
@@ -14,8 +15,9 @@ if __name__ == '__main__':
     ROOT_DIR = "data"
     TEST_DIR = os.path.join(ROOT_DIR, "test", sys.argv[1])
     RECON_DIR = os.path.join(ROOT_DIR, "reconstructions")
+    FIGURE_DIR = os.path.join("results", "figures")
 
-    for d in [ROOT_DIR, TEST_DIR, RECON_DIR]:
+    for d in [ROOT_DIR, TEST_DIR, RECON_DIR, FIGURE_DIR]:
         if not os.path.exists(d):
             os.makedirs(d)
 
@@ -27,6 +29,19 @@ if __name__ == '__main__':
     with open(model_path) as json_data:
         model = model_from_json(json.load(json_data))
     model.load_weights(weight_path)
+
+    # plot samples
+    if True:
+        _, _, dims = load_slice_data(TEST_DIR,
+                                     file_cutoff=1,
+                                     middle_only=True)
+        batch_size = 64
+        latent_dim = 4
+        plot_latent_sampling(model.get_layer("decoder"),
+                             dims,
+                             latent_dim=latent_dim,
+                             figure_dir=FIGURE_DIR,
+                             batch_size=batch_size)
 
     ########## LOAD DATA ##########
 
@@ -55,10 +70,8 @@ if __name__ == '__main__':
         '''
 
         target_dims = (256, 320)
-        img_slice = lazy_downsample(
-            pad_image(
-                load_middle_slice(filename),
-                target_dims))
+        img_slice = lazy_downsample(pad_image(load_middle_slice(filename),
+                                              target_dims))
         img_slice = np.reshape(img_slice, (1,) + img_slice.shape)
         pred_slice = model.predict(img_slice, batch_size=1, verbose=0)
 
